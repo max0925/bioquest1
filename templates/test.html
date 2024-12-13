@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioQuest - Learning Platform</title>
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+    <div class="head-block">
+        <h1>Welcome BioQuest</h1>
+        <img class="svg-dna" src="./assets/dna.svg" alt="icon-bio">
+    </div>
+    <p>Your learning assistant for biology and more!</p>
+
+
+    <!-- Раздел чата -->
+    <div id="chatbox" class="section">
+        <h2>Ask me </h2>
+        <div id="messages"></div>
+        <input type="text" id="chatInput" placeholder="Ask me">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <!-- Раздел для мультимедиа -->
+    <div id="media-section" class="section">
+        <div class="media-info">
+            <h2>Explore Media</h2>
+            <label for="mediaTopic">Topic:</label>
+            <input type="text" id="mediaTopic" placeholder="e.g., photosynthesis">
+            <button onclick="fetchMedia()">Fetch Media</button>
+        </div>
+        <div class="mediaDisplay">
+            <div class="block-img">
+                <h3>Image:</h3>
+                <img id="mediaImage" alt="Image related to the topic will appear here"
+                    src="https://media.istockphoto.com/id/1396814518/vector/image-coming-soon-no-photo-no-thumbnail-image-available-vector-illustration.jpg?s=612x612&w=0&k=20&c=hnh2OZgQGhf0b46-J2z7aHbIWwq8HNlSDaNp2wn_iko=">
+            </div>
+            <div class="block-video">
+                <h3>Video:</h3>
+                <iframe id="mediaVideo"
+                    src="https://support.google.com/webmasters/thread/223018858/video-not-found-on-host-service-but-present-on-host-service?hl=en"
+                    allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Раздел для викторин -->
+    <div id="quiz-section" class="section">
+        <h2>Generate a Quiz</h2>
+        <label for="quizTopic">Тема:</label>
+        <input type="text" id="quizTopic" placeholder="e.g., photosynthesis">
+        <label for="quizQuestions"> Number of Questions:</label>
+        <select id="quizQuestions">
+            <option value="3">3</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+        </select>
+        <button onclick="generateQuiz()">Generate Quiz</button>
+        <h3>Quiz Questions:</h3>
+        <div class="loader-block">
+            <div class="loader" style="display: none;"></div> <!--Скрытый индикатор загрузки-->
+        </div>
+        <div id="quizOutput"></div>
+    </div>
+
+    <script>
+        // URL вашего API (Heroku или другой сервер)
+        const API_BASE = "https://bioquest1-c1639d89ae16.herokuapp.com/";
+
+        // Логика для работы с чатом
+        async function sendMessage() {
+            const userMessage = document.getElementById("chatInput").value;
+            if (!userMessage) {
+                alert("Пожалуйста, введите сообщение!");
+                return;
+            }
+
+            // Отображение сообщения пользователя в интерфейсе
+            addMessageToChat("user", userMessage);
+
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ prompt: userMessage })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ошибка HTTP! Статус: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const assistantMessage = data.data.chat_history[data.data.chat_history.length - 1].content;
+
+                addMessageToChat("assistant", assistantMessage);
+            } catch (error) {
+                addMessageToChat("assistant", "Ошибка: " + error.message);
+            }
+
+            document.getElementById("chatInput").value = "";
+        }
+
+        function addMessageToChat(role, content) {
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "message " + (role === "user" ? "user-message" : "assistant-message");
+            messageDiv.textContent = `${role.charAt(0).toUpperCase() + role.slice(1)}: ${content}`;
+            document.getElementById("messages").appendChild(messageDiv);
+        }
+
+        // Логика загрузки мультимедиа (изображения и видео)
+        async function fetchMedia() {
+            const topic = document.getElementById("mediaTopic").value;
+            if (!topic) {
+                alert("Пожалуйста, введите тему!");
+                return;
+            }
+
+            try {
+                const imageResponse = await fetch(`${API_BASE}/image?topic=${topic}`);
+                if (imageResponse.ok) {
+                    const imageData = await imageResponse.json();
+                    document.getElementById("mediaImage").src = imageData.url;
+                } else {
+                    document.getElementById("mediaImage").alt = "Изображение не найдено.";
+                }
+
+                const videoResponse = await fetch(`${API_BASE}/video?topic=${topic}`);
+                if (videoResponse.ok) {
+                    const videoData = await videoResponse.json();
+                    document.getElementById("mediaVideo").src = videoData.url;
+                } else {
+                    document.getElementById("mediaVideo").src = "";
+                }
+            } catch (error) {
+                alert("Ошибка загрузки мультимедиа: " + error.message);
+            }
+        }
+
+        // Логика генерации викторины
+        async function generateQuiz() {
+            const topic = document.getElementById("quizTopic").value;
+            const numQuestions = document.getElementById("quizQuestions").value;
+
+            if (!topic) {
+                alert("Пожалуйста, введите тему для викторины!");
+                return;
+            }
+
+            // Показать индикатор загрузки
+            const loader = document.querySelector(".loader");
+            loader.style.display = "block";
+
+            try {
+                const response = await fetch(`${API_BASE}/quiz?topic=${topic}&num_questions=${numQuestions}`);
+                if (!response.ok) {
+                    throw new Error(`Ошибка HTTP! Статус: ${response.status}`);
+                }
+
+                const data = await response.json();
+                document.getElementById("quizOutput").innerText = JSON.stringify(data.questions, null, 2);
+                loader.style.display = "none";
+                console.log(data)
+
+
+                displayQuiz(data);
+            } catch (error) {
+                // Скрыть индикатор загрузки в случае ошибки
+                loader.style.display = "none";
+                document.getElementById("quizOutput").innerHTML = `<p>Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        function displayQuiz(quizData) {
+            const quizOutput = document.getElementById("quizOutput");
+            quizOutput.innerHTML = "";
+
+            // Проверяем, что quizData.questions существует и является массивом
+            const questions = quizData.questions || [];
+
+            // Перебираем вопросы и отображаем их
+            questions.forEach((item, index) => {
+                const questionContainer = document.createElement("div");
+                questionContainer.className = "quiz-question";
+
+                const questionText = document.createElement("p");
+                questionText.textContent = item.question;
+                questionContainer.appendChild(questionText);
+
+                item.options.forEach(option => {
+                    const optionLabel = document.createElement("label");
+                    optionLabel.className = "quiz-option";
+
+                    const optionInput = document.createElement("input");
+                    optionInput.type = "radio";
+                    optionInput.name = `question-${index}`;
+                    optionInput.value = option;
+
+                    optionLabel.appendChild(optionInput);
+                    optionLabel.appendChild(document.createTextNode(option));
+                    questionContainer.appendChild(optionLabel);
+                });
+
+                quizOutput.appendChild(questionContainer);
+            });
+        }
+
+    </script>
+
+</body>
+
+</html>
